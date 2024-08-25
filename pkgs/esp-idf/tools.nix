@@ -22,7 +22,8 @@ let
     esp-clang = pkgs: (with pkgs; [ zlib libxml2 ]);
     riscv32-esp-elf = pkgs: (with pkgs; [ ]);
     esp32ulp-elf = pkgs: (with pkgs; [ ]);
-    openocd-esp32 = pkgs: (with pkgs; [ zlib libusb1 udev ]);
+    esp-rom-elfs = pkgs: (with pkgs; [ ]);
+    qemu-riscv32 = pkgs: (with pkgs; [ libgcrypt SDL2 libslirp glib zlib ]);
   };
   # Map nix system strings to the platforms listed in tools.json
   systemToToolPlatformString = {
@@ -35,9 +36,15 @@ let
   toolSpecToDerivation = toolSpec:
     let
       targetPlatform = systemToToolPlatformString.${system};
-      targetVersionSpec = (builtins.elemAt toolSpec.versions 0).${targetPlatform};
+      toolSpecVersion = (builtins.elemAt toolSpec.versions 0);
+      targetVersionSpec = if toolSpecVersion ? ${targetPlatform} then toolSpecVersion.${targetPlatform} else toolSpecVersion.any;
+
+      # Some tools like "esp-rom-elfs" don't actually contain executable code and don't contain an FHS directory structure.
+      # sourceRoot is set to "." in this case to avoid the unpacker failing with "unpacker appears to have produced no directories"
+      isExecutable = if toolSpec ? is_executable then toolSpec.is_executable else true;
     in
     mkToolDerivation {
+      inherit toolSpec;
       pname = toolSpec.name;
 
       # NOTE: tools.json does not separately specify the versions of tools,
@@ -52,6 +59,7 @@ let
       sha256 = targetVersionSpec.sha256;
       targetPkgs = toolFhsEnvTargetPackages."${toolSpec.name}";
       exportVars = toolSpec.export_vars;
+      sourceRoot = if !isExecutable then "." else "";
     };
 
   mkToolDerivation =
@@ -64,6 +72,8 @@ let
     , sha256
     , targetPkgs
     , exportVars
+    , sourceRoot
+    , toolSpec
     }:
 
     let
@@ -77,10 +87,14 @@ let
     in
 
     stdenv.mkDerivation rec {
-      inherit pname version;
+      inherit pname version sourceRoot;
 
       src = fetchurl {
         inherit url sha256;
+      };
+
+      passthru = {
+        spec = toolSpec;
       };
 
       buildInputs = [ makeWrapper ];

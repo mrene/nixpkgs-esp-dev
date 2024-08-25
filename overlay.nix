@@ -46,4 +46,6 @@ rec {
   # ESP8266
   gcc-xtensa-lx106-elf-bin = prev.callPackage ./pkgs/esp8266-rtos-sdk/esp8266-toolchain-bin.nix { };
   esp8266-rtos-sdk = prev.callPackage ./pkgs/esp8266-rtos-sdk/esp8266-rtos-sdk.nix { };
+
+  esp-qemu = prev.callPackage ./pkgs/qemu.nix {};
 }

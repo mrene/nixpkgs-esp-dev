@@ -8,6 +8,7 @@
     "riscv32-esp-elf"
     "esp32ulp-elf"
     "openocd-esp32"
+    "esp-rom-elfs"
   ]
 , stdenv
 , lib
@@ -45,7 +46,7 @@ let
     versionSuffix = "esp-idf-${rev}";
   };
 
-  toolDerivationsToInclude = builtins.map (toolName: allTools."${toolName}") toolsToInclude;
+  toolDerivationsToInclude = builtins.listToAttrs (builtins.map (toolName: lib.nameValuePair toolName allTools."${toolName}") toolsToInclude);
 
   customPython =
     (python3.withPackages
@@ -91,6 +92,10 @@ stdenv.mkDerivation rec {
 
   nativeBuildInputs = [ makeWrapper ];
 
+  passthru = {
+    tools = toolDerivationsToInclude;
+  };
+
   propagatedBuildInputs = [
     # This is in propagatedBuildInputs so that downstream derivations will run
     # the Python setup hook and get PYTHONPATH set up correctly.
@@ -112,7 +117,7 @@ stdenv.mkDerivation rec {
     ncurses5
 
     dfu-util
-  ] ++ toolDerivationsToInclude;
+  ] ++ (builtins.attrValues toolDerivationsToInclude);
 
   # We are including cmake and ninja so that downstream derivations (eg. shells)
   # get them in their environment, but we don't actually want any of their build
